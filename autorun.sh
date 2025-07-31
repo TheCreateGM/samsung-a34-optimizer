@@ -111,27 +111,28 @@ disable_package "com.google.android.apps.wallpaper" "Live Wallpapers (AI)"
 disable_package "com.google.android.apps.wallpaper.nexus" "Nexus Wallpapers (AI)"
 disable_package "com.android.wallpaper.livepicker" "Live Wallpaper Picker (AI)"
 
-# Disable Keyboard AI features (but keep keyboards functional)
-echo "Disabling keyboard AI predictions while keeping keyboards working..."
-# Note: We keep the main keyboard apps enabled but disable AI features via settings
+# Keyboard fix - Explicitly enable all keyboard services
+echo "Ensuring all keyboards are enabled and functional..."
+
+# Force enable essential keyboard packages
+enable_package "com.samsung.android.honeyboard" "Samsung Keyboard"
+enable_package "com.google.android.inputmethod.latin" "Gboard"
+enable_package "com.android.inputmethod.latin" "AOSP Keyboard"
+enable_package "com.sec.android.inputmethod" "Samsung Input Method"
+
+# Enable keyboard services
+adb shell settings put secure default_input_method com.samsung.android.honeyboard/.service.HoneyBoardService
+adb shell settings put secure enabled_input_methods com.samsung.android.honeyboard/.service.HoneyBoardService:com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME
+
+# Ensure input method selector is available
 adb shell settings put secure show_ime_with_hard_keyboard 1
-adb shell settings put secure voice_interaction_service ""
-adb shell settings put secure voice_recognition_service ""
 
-# Disable only AI-specific keyboard components, not the main keyboards
-disable_package "com.google.android.apps.inputmethod.zhuyin" "Google Zhuyin Input (AI)"
-disable_package "com.google.android.inputmethod.korean" "Korean IME (AI features)"
-disable_package "com.google.android.inputmethod.japanese" "Japanese IME (AI features)"
+# Clear any keyboard restrictions
+adb shell pm clear com.samsung.android.honeyboard 2>/dev/null
+adb shell pm clear com.google.android.inputmethod.latin 2>/dev/null
 
-# Disable keyboard AI settings via ADB instead of disabling entire keyboards
-echo "Disabling keyboard AI predictions via settings..."
-adb shell settings put secure autofill_service ""
-adb shell settings put secure spell_checker_enabled 0
-adb shell settings put secure show_ime_with_hard_keyboard 0
-
-# Keep Gboard and Samsung Keyboard enabled but disable their AI features
-echo "Note: Keeping main keyboards (Gboard/Samsung) enabled for functionality"
-echo "AI predictions and suggestions have been disabled via settings"
+echo "✓ All keyboards have been explicitly enabled and should work normally"
+echo "✓ Samsung Keyboard set as default with Gboard as backup option"
 
 # Disable Camera AI features
 echo "Disabling camera AI features..."

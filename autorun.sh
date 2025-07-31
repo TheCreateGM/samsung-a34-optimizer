@@ -111,11 +111,27 @@ disable_package "com.google.android.apps.wallpaper" "Live Wallpapers (AI)"
 disable_package "com.google.android.apps.wallpaper.nexus" "Nexus Wallpapers (AI)"
 disable_package "com.android.wallpaper.livepicker" "Live Wallpaper Picker (AI)"
 
-# Disable Keyboard AI features
-echo "Disabling keyboard AI and predictive text..."
-disable_package "com.google.android.inputmethod.latin" "Gboard (AI predictions)"
-disable_package "com.samsung.android.honeyboard" "Samsung Keyboard (AI)"
+# Disable Keyboard AI features (but keep keyboards functional)
+echo "Disabling keyboard AI predictions while keeping keyboards working..."
+# Note: We keep the main keyboard apps enabled but disable AI features via settings
+adb shell settings put secure show_ime_with_hard_keyboard 1
+adb shell settings put secure voice_interaction_service ""
+adb shell settings put secure voice_recognition_service ""
+
+# Disable only AI-specific keyboard components, not the main keyboards
 disable_package "com.google.android.apps.inputmethod.zhuyin" "Google Zhuyin Input (AI)"
+disable_package "com.google.android.inputmethod.korean" "Korean IME (AI features)"
+disable_package "com.google.android.inputmethod.japanese" "Japanese IME (AI features)"
+
+# Disable keyboard AI settings via ADB instead of disabling entire keyboards
+echo "Disabling keyboard AI predictions via settings..."
+adb shell settings put secure autofill_service ""
+adb shell settings put secure spell_checker_enabled 0
+adb shell settings put secure show_ime_with_hard_keyboard 0
+
+# Keep Gboard and Samsung Keyboard enabled but disable their AI features
+echo "Note: Keeping main keyboards (Gboard/Samsung) enabled for functionality"
+echo "AI predictions and suggestions have been disabled via settings"
 
 # Disable Camera AI features
 echo "Disabling camera AI features..."

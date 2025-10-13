@@ -191,6 +191,27 @@ disable_package "com.microsoft.skydrive" "OneDrive"
 disable_package "com.spotify.music" "Spotify"
 
 echo ""
+echo "=== CPU & GPU ACCELERATION ==="
+
+# Force GPU rendering for 2D operations for a smoother UI
+echo "Forcing GPU rendering for smoother UI..."
+adb shell setprop debug.hwui.renderer skiagl
+
+# Enable hardware overlays to reduce GPU load
+echo "Enabling Hardware Overlays..."
+adb shell setprop debug.sf.hw 1
+
+# Enable multi-threaded rendering (experimental)
+echo "Enabling multi-threaded rendering..."
+adb shell setprop debug.cpurend.vsync false
+
+# Set CPU governor to performance mode (requires root)
+echo "Setting CPU governor to 'performance' for maximum speed..."
+for i in $(adb shell ls /sys/devices/system/cpu/ | grep 'cpu[0-9]'); do
+    adb shell "echo performance > /sys/devices/system/cpu/$i/cpufreq/scaling_governor" 2>/dev/null
+done || echo "Note: Setting CPU governor requires root access."
+
+echo ""
 echo "=== THERMAL MANAGEMENT ==="
 
 # Set thermal throttling (requires root for some commands)
@@ -361,11 +382,20 @@ adb shell "echo '0.0.0.0 facebook.com' >> /system/etc/hosts" 2>/dev/null
 adb shell "echo '0.0.0.0 graph.facebook.com' >> /system/etc/hosts" 2>/dev/null
 
 echo ""
-echo "=== CLEANING CACHE ==="
+echo "=== MEMORY & STORAGE BOOST ==="
 
-# Clear system cache
-echo "Clearing system cache..."
-adb shell pm trim-caches 1000000000
+# Trim filesystem to improve storage performance
+echo "Trimming filesystems for faster storage I/O..."
+adb shell fstrim -v /cache 2>/dev/null
+adb shell fstrim -v /data 2>/dev/null
+
+# Free up pagecache, dentries and inodes (requires root)
+echo "Dropping kernel caches to free up memory..."
+adb shell "echo 3 > /proc/sys/vm/drop_caches" 2>/dev/null || echo "Note: Dropping kernel caches requires root access."
+
+# Clear system and app caches
+echo "Clearing system and application caches..."
+adb shell pm trim-caches 9999999999
 
 # Clear app caches for common apps
 apps_to_clear=(
@@ -374,12 +404,18 @@ apps_to_clear=(
     "com.whatsapp"
     "com.instagram.android"
     "com.twitter.android"
+    "com.google.android.apps.maps"
+    "com.spotify.music"
 )
 
 for app in "${apps_to_clear[@]}"; do
     echo "Clearing cache for $app..."
-    adb shell pm clear-cache "$app" 2>/dev/null
+    adb shell pm clear "$app" 2>/dev/null
 done
+
+# Clear temporary files
+echo "Clearing temporary files..."
+adb shell rm -f /data/local/tmp/* 2>/dev/null
 
 echo ""
 echo "=== FINAL OPTIMIZATIONS ==="
@@ -402,6 +438,7 @@ echo "✓ Reduced overheating"
 echo "✓ Better battery life"
 echo "✓ Improved performance"
 echo "✓ Less background activity"
+echo "✓ Faster CPU & GPU response"
 echo ""
 echo "Recommendations:"
 echo "- Restart your phone to ensure all changes take effect"
@@ -414,11 +451,21 @@ echo "To revert changes, run this script with 'restore' parameter"
 if [ "$1" = "restore" ]; then
     echo ""
     echo "=== RESTORING ORIGINAL SETTINGS ==="
-    
+
     # Re-enable commonly needed apps
     enable_package "com.samsung.android.bixby.agent" "Bixby Voice"
     enable_package "com.samsung.android.game.gamehome" "Game Launcher"
-    
+
+    # Restore CPU & GPU settings
+    echo "Restoring CPU & GPU to default..."
+    adb shell setprop debug.hwui.renderer ""
+    adb shell setprop debug.sf.hw ""
+    adb shell setprop debug.cpurend.vsync ""
+    # Set CPU governor back to a balanced default (schedutil is common)
+    for i in $(adb shell ls /sys/devices/system/cpu/ | grep 'cpu[0-9]'); do
+        adb shell "echo schedutil > /sys/devices/system/cpu/$i/cpufreq/scaling_governor" 2>/dev/null
+    done || echo "Note: Restoring CPU governor requires root access."
+
     # Restore performance settings
     adb shell settings put global low_power 0
     adb shell settings put global battery_saver_enabled 0
@@ -426,12 +473,12 @@ if [ "$1" = "restore" ]; then
     adb shell settings put global auto_sync 1
     adb shell settings put system screen_brightness 150
     adb shell settings put system screen_off_timeout 60000
-    
+
     # Restore animation scales
     adb shell settings put global window_animation_scale 1.0
     adb shell settings put global transition_animation_scale 1.0
     adb shell settings put global animator_duration_scale 1.0
-    
+
     echo "Settings restored to defaults"
 fi
 

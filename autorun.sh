@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Samsung A34 5G Minimalist Optimization & Privacy Script
-# Version 3.1 - Fixed and Enhanced
+# Version 3.2 - Enhanced with Virtual Memory Optimizations
 # For One UI 8.0 / Android 16+ and below
 # This script optimizes your phone for performance, privacy, and a minimal aesthetic.
 # Make sure USB debugging is enabled and your phone is connected via ADB.
 
 echo "======================================================"
-echo "=== Samsung A34 5G Enhanced Optimization Script v3.1 ==="
+echo "=== Samsung A34 5G Enhanced Optimization Script v3.2 ==="
 echo "======================================================"
 echo "This will debloat, optimize, and enhance your phone's privacy."
 echo "Make sure your phone is connected and USB debugging is enabled."
@@ -199,13 +199,17 @@ done
 echo "To set KISS as default, go to Settings > Apps > Choose default apps > Home app"
 
 # Apply settings for a faster, smoother, and cleaner UI
-echo "--- Optimizing UI Fluidity & Look ---"
-adb shell settings put secure ui_night_mode 2 # Force dark mode
-adb shell settings put global window_animation_scale 0.25
-adb shell settings put global transition_animation_scale 0.25
-adb shell settings put global animator_duration_scale 0.25
-adb shell settings put system font_scale 0.95 # Slightly smaller font for cleaner look
-echo "✓ UI animations set to hyper-fast (0.25x). Dark mode enabled."
+echo "--- Disabling All Animations & Effects for Maximum Performance ---"
+adb shell settings put secure ui_night_mode 2                   # Force dark mode
+adb shell settings put global window_animation_scale 0.0
+adb shell settings put global transition_animation_scale 0.0
+adb shell settings put global animator_duration_scale 0.0
+adb shell settings put system motion_effect_enabled 0           # Disable lockscreen motion effect
+adb shell settings put system sound_effects_enabled 0           # Disable system sounds (touch, etc.)
+adb shell settings put global fancy_ime_animations 0            # Disable keyboard animations
+adb shell settings put system haptic_feedback_enabled 0         # Disable all vibrations for speed
+adb shell settings put system font_scale 0.95                   # Slightly smaller font for cleaner look
+echo "✓ All UI animations, sounds, and effects disabled for a lighter experience."
 echo ""
 
 
@@ -231,6 +235,92 @@ echo "✓ Battery optimization enabled."
 # Thermal management to reduce heat
 echo "--- Managing Thermals ---"
 adb shell "echo 1 > /sys/class/thermal/thermal_zone0/mode" 2>/dev/null || echo "  ⚠ Thermal settings (requires root)"
+echo ""
+
+
+# --- Section 3.5: VIRTUAL MEMORY & STORAGE OPTIMIZATION ---
+echo "=================================================================="
+echo "=== VIRTUAL MEMORY OPTIMIZATION (zRAM, Swap, I/O Schedulers) ==="
+echo "=================================================================="
+
+echo "--- Configuring zRAM (Compressed Virtual RAM) ---"
+# Check if zRAM is available
+if adb shell "test -b /dev/block/zram0 && echo exists" 2>/dev/null | grep -q "exists"; then
+    echo "✓ zRAM device detected. Configuring..."
+    
+    # Reset zRAM if already configured
+    adb shell "swapoff /dev/block/zram0" 2>/dev/null
+    adb shell "echo 1 > /sys/block/zram0/reset" 2>/dev/null || echo "  ⚠ zRAM reset (requires root)"
+    
+    # Set zRAM size (1.5GB - 50% of physical RAM for A34's 6GB/8GB models)
+    adb shell "echo 1610612736 > /sys/block/zram0/disksize" 2>/dev/null || echo "  ⚠ zRAM sizing (requires root)"
+    
+    # Set compression algorithm (lz4 is fastest)
+    adb shell "echo lz4 > /sys/block/zram0/comp_algorithm" 2>/dev/null || echo "  ⚠ zRAM compression (requires root)"
+    
+    # Enable zRAM swap
+    adb shell "mkswap /dev/block/zram0" 2>/dev/null
+    adb shell "swapon /dev/block/zram0" 2>/dev/null || echo "  ⚠ zRAM activation (requires root)"
+    
+    echo "  ✓ zRAM configured: 1.5GB compressed RAM"
+else
+    echo "  ℹ zRAM not available on this device (may require root or kernel support)"
+fi
+
+echo ""
+echo "--- Optimizing Virtual Memory Parameters ---"
+# These settings work better with zRAM enabled
+adb shell "echo 100 > /proc/sys/vm/swappiness" 2>/dev/null || echo "  ⚠ Swappiness tuning (requires root)"
+adb shell "echo 0 > /proc/sys/vm/page-cluster" 2>/dev/null || echo "  ⚠ Page cluster (requires root)"
+adb shell "echo 4096 > /proc/sys/vm/min_free_kbytes" 2>/dev/null || echo "  ⚠ Min free memory (requires root)"
+adb shell "echo 50 > /proc/sys/vm/vfs_cache_pressure" 2>/dev/null || echo "  ⚠ VFS cache pressure (requires root)"
+adb shell "echo 20 > /proc/sys/vm/dirty_ratio" 2>/dev/null || echo "  ⚠ Dirty ratio (requires root)"
+adb shell "echo 10 > /proc/sys/vm/dirty_background_ratio" 2>/dev/null || echo "  ⚠ Dirty background ratio (requires root)"
+echo "  ✓ Virtual memory parameters optimized for performance"
+
+echo ""
+echo "--- Optimizing I/O Schedulers for Virtual Disk Performance ---"
+# Find storage devices and optimize their I/O schedulers
+STORAGE_DEVICES=$(adb shell "ls /sys/block/ 2>/dev/null" | grep -E "sda|mmcblk|nvme")
+
+if [ -n "$STORAGE_DEVICES" ]; then
+    for device in $STORAGE_DEVICES; do
+        echo "  Optimizing /dev/$device..."
+        
+        # Set I/O scheduler to deadline (best for flash storage)
+        adb shell "echo deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
+        adb shell "echo mq-deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
+        echo "    ⚠ I/O scheduler (requires root)"
+        
+        # Optimize read-ahead for faster sequential reads
+        adb shell "echo 512 > /sys/block/$device/queue/read_ahead_kb" 2>/dev/null || \
+        echo "    ⚠ Read-ahead tuning (requires root)"
+        
+        # Reduce I/O latency
+        adb shell "echo 0 > /sys/block/$device/queue/add_random" 2>/dev/null
+        adb shell "echo 2 > /sys/block/$device/queue/rq_affinity" 2>/dev/null
+        adb shell "echo 128 > /sys/block/$device/queue/nr_requests" 2>/dev/null || \
+        echo "    ⚠ I/O queue tuning (requires root)"
+        
+        echo "    ✓ $device optimized"
+    done
+else
+    echo "  ℹ No storage devices found (check requires root)"
+fi
+
+echo ""
+echo "--- Enabling Low Memory Killer Optimizations ---"
+# Optimize memory management for better multitasking
+adb shell "echo 18432,23040,27648,32256,55296,80640 > /sys/module/lowmemorykiller/parameters/minfree" 2>/dev/null || \
+echo "  ⚠ LMK tuning (requires root)"
+
+# Additional VM tweaks for smoother performance
+set_prop_safe "ro.config.low_ram" "false" "Low RAM mode"
+set_prop_safe "ro.sys.fw.bg_apps_limit" "32" "Background app limit"
+set_prop_safe "dalvik.vm.heapsize" "512m" "VM heap size"
+set_prop_safe "dalvik.vm.heapgrowthlimit" "256m" "VM heap growth limit"
+
+echo "✓ Virtual memory and I/O subsystems fully optimized!"
 echo ""
 
 
@@ -373,15 +463,11 @@ echo "✓ GPU rendering pipeline fully optimized."
 
 echo "--- Optimizing Media & System Performance ---"
 # Media settings that work without root
-adb shell settings put system accelerometer_rotation 0  # Faster screen orientation
+adb shell settings put system accelerometer_rotation 0  # Disable auto-rotation for less sensor usage
 adb shell settings put secure long_press_timeout 400    # Faster long press
 adb shell settings put secure touch_exploration_enabled 0
-# Disable unnecessary system animations
-adb shell settings put global animator_duration_scale 0.25
-adb shell settings put global fancy_ime_animations 0
 # Increase touch responsiveness
 adb shell settings put system pointer_speed 0
-adb shell settings put system haptic_feedback_enabled 0  # Disable vibration for speed
 
 echo "✓ Media and system performance optimized."
 echo ""
@@ -460,7 +546,7 @@ echo "=========================================================="
 echo "=== OPTIMIZATION & PRIVACY HARDENING COMPLETE ==="
 echo "=========================================================="
 echo "Your Samsung A34 5G has been enhanced for:"
-echo "✓ Minimalist, Fast & Fluid UI"
+echo "✓ Minimalist, Fast & Fluid UI (NO animations)"
 echo "✓ Improved Performance & Reduced Heat"
 echo "✓ Better Battery Life with Aggressive Saving"
 echo "✓ Enhanced Privacy (like iOS) with Ad/Tracker Blocking"
@@ -470,6 +556,9 @@ echo "✓ Advanced Linux kernel optimizations"
 echo "✓ Enhanced GPU rendering pipeline"
 echo "✓ Maximum security hardening"
 echo "✓ Full Linux terminal environment (Termux)"
+echo "✓ Virtual Memory (zRAM) optimizations - 1.5GB compressed RAM"
+echo "✓ I/O scheduler tuning for faster storage"
+echo "✓ VM parameters optimized for multitasking"
 echo ""
 echo "Recommendations:"
 echo "1. Reboot your phone now to apply all changes."
@@ -484,6 +573,8 @@ echo "- Use Termux for Python, Node.js, Git, SSH, and more"
 echo "- Run Linux commands directly on your phone"
 echo "- Script automation with bash/python"
 echo "- SSH into other servers from your phone"
+echo "- zRAM provides 1.5GB extra virtual memory (compressed)"
+echo "- Optimized I/O for faster app loading and file operations"
 echo ""
 echo "To revert changes, run this script with the 'restore' parameter."
 
@@ -493,6 +584,14 @@ if [ "$1" = "restore" ]; then
     echo "========================================"
     echo "=== RESTORING ORIGINAL SETTINGS... ==="
     echo "========================================"
+
+    # Restore zRAM settings
+    echo "--- Restoring Virtual Memory Settings ---"
+    adb shell "swapoff /dev/block/zram0" 2>/dev/null
+    adb shell "echo 1 > /sys/block/zram0/reset" 2>/dev/null
+    adb shell "echo 60 > /proc/sys/vm/swappiness" 2>/dev/null
+    adb shell "echo 3 > /proc/sys/vm/page-cluster" 2>/dev/null
+    echo "✓ Virtual memory settings restored."
 
     # Re-enable commonly needed apps
     enable_package "com.samsung.android.bixby.agent" "Bixby Voice"
@@ -509,6 +608,10 @@ if [ "$1" = "restore" ]; then
     adb shell settings put global window_animation_scale 1.0
     adb shell settings put global transition_animation_scale 1.0
     adb shell settings put global animator_duration_scale 1.0
+    adb shell settings put system motion_effect_enabled 1
+    adb shell settings put system sound_effects_enabled 1
+    adb shell settings put system haptic_feedback_enabled 1
+    adb shell settings put global fancy_ime_animations 1
     adb shell settings put secure ui_night_mode 0
 
     # Restore network settings

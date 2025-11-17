@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Samsung A34 5G Minimalist Optimization & Privacy Script
-# Version 3.2 - Enhanced with Virtual Memory Optimizations
+# Version 3.3 - With Root Bypass Attempt
 # For One UI 8.0 / Android 16+ and below
 # This script optimizes your phone for performance, privacy, and a minimal aesthetic.
 # Make sure USB debugging is enabled and your phone is connected via ADB.
 
 echo "======================================================"
-echo "=== Samsung A34 5G Enhanced Optimization Script v3.2 ==="
+echo "=== Samsung A34 5G Enhanced Optimization Script v3.3 ==="
 echo "======================================================"
 echo "This will debloat, optimize, and enhance your phone's privacy."
 echo "Make sure your phone is connected and USB debugging is enabled."
@@ -41,6 +41,33 @@ fi
 
 echo "✓ Device detected. Starting optimization..."
 echo ""
+
+# --- Section 0: Root Privilege Escalation (Bypass) ---
+echo "======================================================"
+echo "=== Attempting to Bypass Root Requirements via ADB ==="
+echo "======================================================"
+echo "This will try to restart ADB in root mode to apply deeper optimizations."
+echo "On most stock devices, this will be skipped. This is normal."
+
+# Attempt to restart adbd as root.
+adb root >/dev/null 2>&1
+# Wait for the device to reconnect after adb root command
+sleep 3
+adb wait-for-device
+
+# Check if we successfully gained root privileges
+if [[ "$(adb shell whoami 2>/dev/null)" == "root" ]]; then
+    echo "✓ SUCCESS: ADB is now running with root privileges."
+    echo "  System-level modifications will now be applied."
+    # Optional: Remount system partition as read-write for deeper changes
+    adb shell 'mount -o rw,remount /' >/dev/null 2>&1
+    adb shell 'mount -o rw,remount /system' >/dev/null 2>&1
+else
+    echo "ℹ INFO: Could not gain root privileges."
+    echo "  The script will continue with standard non-root optimizations."
+fi
+echo ""
+
 
 # --- Helper Functions ---
 
@@ -247,21 +274,21 @@ echo "--- Configuring zRAM (Compressed Virtual RAM) ---"
 # Check if zRAM is available
 if adb shell "test -b /dev/block/zram0 && echo exists" 2>/dev/null | grep -q "exists"; then
     echo "✓ zRAM device detected. Configuring..."
-    
+
     # Reset zRAM if already configured
     adb shell "swapoff /dev/block/zram0" 2>/dev/null
     adb shell "echo 1 > /sys/block/zram0/reset" 2>/dev/null || echo "  ⚠ zRAM reset (requires root)"
-    
+
     # Set zRAM size (1.5GB - 50% of physical RAM for A34's 6GB/8GB models)
     adb shell "echo 1610612736 > /sys/block/zram0/disksize" 2>/dev/null || echo "  ⚠ zRAM sizing (requires root)"
-    
+
     # Set compression algorithm (lz4 is fastest)
     adb shell "echo lz4 > /sys/block/zram0/comp_algorithm" 2>/dev/null || echo "  ⚠ zRAM compression (requires root)"
-    
+
     # Enable zRAM swap
     adb shell "mkswap /dev/block/zram0" 2>/dev/null
     adb shell "swapon /dev/block/zram0" 2>/dev/null || echo "  ⚠ zRAM activation (requires root)"
-    
+
     echo "  ✓ zRAM configured: 1.5GB compressed RAM"
 else
     echo "  ℹ zRAM not available on this device (may require root or kernel support)"
@@ -286,22 +313,22 @@ STORAGE_DEVICES=$(adb shell "ls /sys/block/ 2>/dev/null" | grep -E "sda|mmcblk|n
 if [ -n "$STORAGE_DEVICES" ]; then
     for device in $STORAGE_DEVICES; do
         echo "  Optimizing /dev/$device..."
-        
+
         # Set I/O scheduler to deadline (best for flash storage)
         adb shell "echo deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
         adb shell "echo mq-deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
         echo "    ⚠ I/O scheduler (requires root)"
-        
+
         # Optimize read-ahead for faster sequential reads
         adb shell "echo 512 > /sys/block/$device/queue/read_ahead_kb" 2>/dev/null || \
         echo "    ⚠ Read-ahead tuning (requires root)"
-        
+
         # Reduce I/O latency
         adb shell "echo 0 > /sys/block/$device/queue/add_random" 2>/dev/null
         adb shell "echo 2 > /sys/block/$device/queue/rq_affinity" 2>/dev/null
         adb shell "echo 128 > /sys/block/$device/queue/nr_requests" 2>/dev/null || \
         echo "    ⚠ I/O queue tuning (requires root)"
-        
+
         echo "    ✓ $device optimized"
     done
 else
@@ -552,7 +579,7 @@ echo "✓ Better Battery Life with Aggressive Saving"
 echo "✓ Enhanced Privacy (like iOS) with Ad/Tracker Blocking"
 echo "✓ Faster & More Stable WiFi"
 echo "✓ Optimized Java/Dalvik VM for faster apps"
-echo "✓ Advanced Linux kernel optimizations"
+echo "✓ Advanced Linux kernel optimizations (if root was gained)"
 echo "✓ Enhanced GPU rendering pipeline"
 echo "✓ Maximum security hardening"
 echo "✓ Full Linux terminal environment (Termux)"

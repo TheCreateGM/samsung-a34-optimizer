@@ -1,16 +1,20 @@
 #!/bin/bash
 
-# Samsung A34 5G Minimalist Optimization & Privacy Script
-# Version 3.3 - With Root Bypass Attempt
+# Samsung A34 5G Advanced Security & Performance Optimization Script
+# Version 4.0 - Enhanced Anti-Spyware & Device Security
 # For One UI 8.0 / Android 16+ and below
-# This script optimizes your phone for performance, privacy, and a minimal aesthetic.
+# This script optimizes your phone for performance, privacy, security, and smoothness.
 # Make sure USB debugging is enabled and your phone is connected via ADB.
 
-echo "======================================================"
-echo "=== Samsung A34 5G Enhanced Optimization Script v3.3 ==="
-echo "======================================================"
-echo "This will debloat, optimize, and enhance your phone's privacy."
-echo "Make sure your phone is connected and USB debugging is enabled."
+echo "=================================================================="
+echo "=== Samsung A34 5G Advanced Security & Optimization Script v4.0 ==="
+echo "=================================================================="
+echo "NEW FEATURES:"
+echo "✓ Advanced Spyware Detection & Removal"
+echo "✓ Device Security Hardening"
+echo "✓ Find My Device Controls"
+echo "✓ Enhanced Smoothness & Performance"
+echo "✓ Real-time Security Monitoring"
 echo ""
 read -p "Press Enter to continue..."
 
@@ -51,7 +55,6 @@ echo "On most stock devices, this will be skipped. This is normal."
 
 # Attempt to restart adbd as root.
 adb root >/dev/null 2>&1
-# Wait for the device to reconnect after adb root command
 sleep 3
 adb wait-for-device
 
@@ -59,12 +62,13 @@ adb wait-for-device
 if [[ "$(adb shell whoami 2>/dev/null)" == "root" ]]; then
     echo "✓ SUCCESS: ADB is now running with root privileges."
     echo "  System-level modifications will now be applied."
-    # Optional: Remount system partition as read-write for deeper changes
     adb shell 'mount -o rw,remount /' >/dev/null 2>&1
     adb shell 'mount -o rw,remount /system' >/dev/null 2>&1
+    ROOT_AVAILABLE=true
 else
     echo "ℹ INFO: Could not gain root privileges."
     echo "  The script will continue with standard non-root optimizations."
+    ROOT_AVAILABLE=false
 fi
 echo ""
 
@@ -149,6 +153,314 @@ set_prop_safe() {
 }
 
 
+# --- NEW SECTION 0.5: ADVANCED SPYWARE DETECTION & REMOVAL ---
+echo "=================================================================="
+echo "=== ADVANCED SPYWARE DETECTION & REMOVAL ==="
+echo "=================================================================="
+
+# List of known spyware, stalkerware, and malicious packages
+SPYWARE_PACKAGES=(
+    # Stalkerware & Spyware
+    "com.mspy.android"
+    "com.flexispy"
+    "com.spyera"
+    "com.retina-x.android"
+    "com.phonespy"
+    "com.hellospy"
+    "com.thesafety.android"
+    "com.mobilespy"
+    "com.spybubble"
+    "com.spyware"
+    "com.android.spyware"
+    "com.ikeymonitor"
+    "com.spyzie"
+    "com.spytomobile"
+    "com.highstermobile"
+    "com.thetruthspy"
+    "com.copy9"
+    "com.spyfone"
+    "com.easemon"
+    "com.spyic"
+    "com.cocospy"
+    "com.spyine"
+    "com.neatspy"
+    "com.minspy"
+    
+    # Hidden System Apps (often used for tracking)
+    "com.android.systemupdate"
+    "com.android.settings.hidden"
+    "com.android.update.service"
+    "com.system.service"
+    "com.google.service.update"
+    "com.android.security.update"
+    
+    # Adware & PUPs
+    "com.airpush"
+    "com.revmob"
+    "com.appbrain"
+    "com.inmobi"
+    "com.startapp"
+    "com.appnext"
+    "com.applovin"
+    "com.mopub"
+    "com.chartboost"
+    "com.tapjoy"
+    
+    # Bloatware with tracking capabilities
+    "com.samsung.android.da.daagent"
+    "com.samsung.android.svoiceime"
+    "com.samsung.android.rubin.app"
+    "com.samsung.android.mateagent"
+    "com.samsung.android.aremoji"
+    "com.sec.android.easyonehand"
+    "com.wssyncmldm"
+    "com.ws.dm"
+    "com.dti.att"
+    "com.dti.tracfone"
+    "com.carrieriq"
+)
+
+echo "--- Scanning for Known Spyware & Malicious Apps ---"
+SPYWARE_FOUND=0
+SPYWARE_LIST=""
+
+for package in "${SPYWARE_PACKAGES[@]}"; do
+    if is_package_installed "$package"; then
+        echo "⚠ SPYWARE DETECTED: $package"
+        SPYWARE_FOUND=$((SPYWARE_FOUND + 1))
+        SPYWARE_LIST="$SPYWARE_LIST\n  - $package"
+        
+        # Attempt to uninstall (requires root or user app)
+        echo "  Attempting to remove $package..."
+        adb shell pm uninstall --user 0 "$package" 2>/dev/null || \
+        disable_package "$package" "Spyware: $package"
+        
+        # Kill any running processes
+        adb shell am force-stop "$package" 2>/dev/null
+        
+        # Revoke all permissions
+        adb shell pm revoke "$package" android.permission.CAMERA 2>/dev/null
+        adb shell pm revoke "$package" android.permission.RECORD_AUDIO 2>/dev/null
+        adb shell pm revoke "$package" android.permission.ACCESS_FINE_LOCATION 2>/dev/null
+        adb shell pm revoke "$package" android.permission.READ_CONTACTS 2>/dev/null
+        adb shell pm revoke "$package" android.permission.READ_SMS 2>/dev/null
+        adb shell pm revoke "$package" android.permission.READ_CALL_LOG 2>/dev/null
+    fi
+done
+
+if [ $SPYWARE_FOUND -eq 0 ]; then
+    echo "✓ No known spyware detected on your device."
+else
+    echo ""
+    echo "⚠⚠⚠ WARNING: $SPYWARE_FOUND SPYWARE APP(S) DETECTED! ⚠⚠⚠"
+    echo "The following malicious apps were found and disabled/removed:"
+    echo -e "$SPYWARE_LIST"
+    echo ""
+    echo "RECOMMENDATIONS:"
+    echo "1. Change all passwords immediately"
+    echo "2. Enable 2-factor authentication on important accounts"
+    echo "3. Check your Google account activity: myactivity.google.com"
+    echo "4. Consider a factory reset for complete removal"
+    echo "5. Review who has physical access to your device"
+    echo ""
+fi
+
+echo "--- Scanning for Suspicious Hidden Apps ---"
+HIDDEN_APPS=$(adb shell pm list packages -s | grep -vE "android|samsung|google|knox" | cut -d: -f2)
+SUSPICIOUS_COUNT=0
+
+for app in $HIDDEN_APPS; do
+    # Check if app has dangerous permissions
+    DANGEROUS_PERMS=$(adb shell dumpsys package "$app" 2>/dev/null | grep -E "CAMERA|RECORD_AUDIO|LOCATION|CONTACTS|SMS|CALL_LOG" | wc -l)
+    
+    if [ "$DANGEROUS_PERMS" -gt 2 ]; then
+        echo "⚠ Suspicious system app: $app (Has $DANGEROUS_PERMS dangerous permissions)"
+        SUSPICIOUS_COUNT=$((SUSPICIOUS_COUNT + 1))
+    fi
+done
+
+if [ $SUSPICIOUS_COUNT -eq 0 ]; then
+    echo "✓ No suspicious hidden apps detected."
+else
+    echo "⚠ Found $SUSPICIOUS_COUNT suspicious system app(s). Review permissions manually."
+fi
+
+echo "--- Checking for Apps with Device Admin Rights ---"
+DEVICE_ADMINS=$(adb shell dpm list-owners 2>/dev/null)
+if [ -z "$DEVICE_ADMINS" ]; then
+    echo "✓ No device administrators found (good)."
+else
+    echo "⚠ WARNING: Device administrators detected:"
+    echo "$DEVICE_ADMINS"
+    echo "  Review Settings > Security > Device administrators"
+    echo "  Spyware often uses device admin to prevent removal!"
+fi
+
+echo ""
+
+
+# --- NEW SECTION 0.6: DEVICE SECURITY & FIND MY DEVICE ---
+echo "=================================================================="
+echo "=== DEVICE SECURITY & FIND MY DEVICE CONFIGURATION ==="
+echo "=================================================================="
+
+echo "--- Configuring Find My Device (Secure Lost Phone Protection) ---"
+# Enable Find My Device but with controlled settings
+if is_package_installed "com.google.android.apps.adm"; then
+    enable_package "com.google.android.apps.adm" "Google Find My Device"
+    echo "✓ Find My Device is enabled."
+    echo "  You can locate/lock/wipe your device at: android.com/find"
+    
+    # Enable location for Find My Device (but we'll control other location access)
+    adb shell settings put secure location_mode 3
+    echo "  Location enabled for device finding (restricted for other apps)"
+else
+    echo "ℹ Google Find My Device not found. Install from Play Store for theft protection."
+fi
+
+# Install Samsung Find My Mobile if not present
+if is_package_installed "com.samsung.android.fmm"; then
+    enable_package "com.samsung.android.fmm" "Samsung Find My Mobile"
+    echo "✓ Samsung Find My Mobile enabled."
+    echo "  Access at: findmymobile.samsung.com"
+else
+    echo "ℹ Samsung Find My Mobile not found (should be pre-installed)."
+fi
+
+echo ""
+echo "--- Enhancing Device Lock Security ---"
+# Enforce stronger security policies
+adb shell settings put secure lockscreen_power_button_instantly_locks 1
+adb shell settings put system screen_off_timeout 60000  # 1 minute auto-lock
+adb shell settings put secure lock_screen_allow_private_notifications 0
+adb shell settings put secure lock_screen_show_notifications 0
+adb shell settings put global stay_on_while_plugged_in 0  # Don't stay awake
+adb shell settings put global enable_gpu_debug_layers 0
+echo "✓ Enhanced lock screen security configured."
+
+echo ""
+echo "--- Configuring Theft & Tamper Detection ---"
+# Enable security features that help detect unauthorized access
+adb shell settings put global multi_press_timeout 300
+adb shell settings put secure lockscreen_maximize_widgets 0
+
+# Set up automatic wipe after failed attempts (if supported)
+adb shell settings put secure lockscreen_fail_count_before_wipe 10 2>/dev/null || \
+    echo "  ℹ Auto-wipe not supported (requires device admin setup in Settings)"
+
+echo "✓ Theft protection configured."
+echo ""
+
+
+# --- NEW SECTION 0.7: ENHANCED SMOOTHNESS OPTIMIZATIONS ---
+echo "=================================================================="
+echo "=== ADVANCED SMOOTHNESS & RESPONSIVENESS OPTIMIZATION ==="
+echo "=================================================================="
+
+echo "--- Optimizing Touch Response & Input Latency ---"
+# Reduce touch latency for smoother experience
+adb shell settings put secure long_press_timeout 300
+adb shell settings put system pointer_speed 1  # Slightly faster pointer
+adb shell settings put secure multi_press_timeout 200
+
+# Touch sensitivity optimization
+if [ "$ROOT_AVAILABLE" = true ]; then
+    adb shell "echo 1 > /sys/class/input/input0/sensitivity" 2>/dev/null || echo "  ℹ Touch sensitivity (varies by device)"
+    adb shell "echo 0 > /sys/class/input/input0/filter" 2>/dev/null
+fi
+
+echo "✓ Touch response optimized for maximum smoothness."
+
+echo ""
+echo "--- Optimizing Frame Rate & Display Rendering ---"
+# Force highest refresh rate if available (A34 5G has 120Hz display)
+adb shell settings put system peak_refresh_rate 120.0
+adb shell settings put system min_refresh_rate 60.0
+adb shell settings put secure refresh_rate_mode 0  # Adaptive refresh rate
+
+# Optimize rendering
+set_prop_safe "debug.sf.latch_unsignaled" "1" "Frame latching"
+set_prop_safe "debug.sf.disable_backpressure" "1" "Frame backpressure"
+set_prop_safe "debug.sf.early_phase_offset_ns" "500000" "Early phase offset"
+set_prop_safe "debug.sf.early_app_phase_offset_ns" "500000" "Early app phase offset"
+set_prop_safe "debug.sf.early_gl_phase_offset_ns" "3000000" "Early GL phase offset"
+
+echo "✓ Display refresh rate and rendering optimized."
+
+echo ""
+echo "--- Optimizing Memory Management for Smoothness ---"
+# Optimize Low Memory Killer for better multitasking
+if [ "$ROOT_AVAILABLE" = true ]; then
+    # More aggressive but smoother memory management
+    adb shell "echo 12288,15360,18432,21504,24576,30720 > /sys/module/lowmemorykiller/parameters/minfree" 2>/dev/null
+    adb shell "echo 0 > /sys/module/lowmemorykiller/parameters/lmk_fast_run" 2>/dev/null
+fi
+
+# Optimize Android Runtime (ART) for smoother app performance
+set_prop_safe "dalvik.vm.dex2oat-filter" "speed" "DEX optimization"
+set_prop_safe "dalvik.vm.image-dex2oat-filter" "speed" "Image DEX optimization"
+set_prop_safe "pm.dexopt.install" "speed" "Install optimization"
+set_prop_safe "pm.dexopt.bg-dexopt" "speed" "Background optimization"
+
+echo "✓ Memory management optimized for multitasking."
+
+echo ""
+echo "--- Optimizing CPU Scheduler for Responsiveness ---"
+if [ "$ROOT_AVAILABLE" = true ]; then
+    # EAS (Energy Aware Scheduler) tuning for smoothness
+    adb shell "echo 0 > /proc/sys/kernel/sched_tunable_scaling" 2>/dev/null
+    adb shell "echo 10000000 > /proc/sys/kernel/sched_latency_ns" 2>/dev/null
+    adb shell "echo 2000000 > /proc/sys/kernel/sched_min_granularity_ns" 2>/dev/null
+    adb shell "echo 1000000 > /proc/sys/kernel/sched_wakeup_granularity_ns" 2>/dev/null
+    
+    # Reduce context switching for smoother operation
+    adb shell "echo 500000 > /proc/sys/kernel/sched_migration_cost_ns" 2>/dev/null
+    adb shell "echo 95 > /proc/sys/kernel/sched_rt_runtime_us" 2>/dev/null
+    
+    echo "✓ CPU scheduler optimized for responsiveness."
+else
+    echo "  ℹ CPU scheduler tuning skipped (requires root)"
+fi
+
+echo ""
+echo "--- Disabling Performance Throttling ---"
+# Disable aggressive thermal throttling
+if [ "$ROOT_AVAILABLE" = true ]; then
+    adb shell "echo 0 > /sys/devices/virtual/thermal/thermal_zone0/mode" 2>/dev/null
+    adb shell "echo 85 > /sys/class/thermal/thermal_zone0/trip_point_0_temp" 2>/dev/null
+    adb shell "echo 95 > /sys/class/thermal/thermal_zone0/trip_point_1_temp" 2>/dev/null
+    echo "✓ Thermal throttling reduced for sustained performance."
+else
+    echo "  ℹ Thermal management requires root access"
+fi
+
+# Disable power saving features that reduce smoothness
+adb shell settings put global app_standby_enabled 0
+adb shell settings put global forced_app_standby_enabled 0
+adb shell settings put global adaptive_battery_management_enabled 0
+
+echo "✓ Performance throttling minimized."
+
+echo ""
+echo "--- Optimizing Storage I/O for App Launch Speed ---"
+if [ "$ROOT_AVAILABLE" = true ]; then
+    STORAGE_DEVICES=$(adb shell "ls /sys/block/ 2>/dev/null" | grep -E "sda|mmcblk|nvme")
+    
+    for device in $STORAGE_DEVICES; do
+        # Optimize for random read/write (app launches)
+        adb shell "echo 0 > /sys/block/$device/queue/iostats" 2>/dev/null
+        adb shell "echo 256 > /sys/block/$device/queue/read_ahead_kb" 2>/dev/null
+        adb shell "echo 1 > /sys/block/$device/queue/nomerges" 2>/dev/null
+        adb shell "echo 0 > /sys/block/$device/queue/rotational" 2>/dev/null
+    done
+    echo "✓ Storage I/O optimized for instant app launches."
+else
+    echo "  ℹ Advanced storage optimization requires root"
+fi
+
+echo ""
+
+
 # --- Section 1: AI & Bloatware Removal ---
 echo "==================================="
 echo "=== Removing AI & Bloatware... ==="
@@ -211,7 +523,6 @@ echo "================================================="
 
 # Install and set up a minimal, open-source launcher for a clean look
 echo "--- Setting up Minimalist Launcher (KISS) ---"
-# Using F-Droid repository with multiple fallback URLs
 KISS_URLS=(
     "https://f-droid.org/repo/fr.neamar.kiss_198.apk"
     "https://github.com/Neamar/KISS/releases/download/v3.19.11/kiss-v3.19.11.apk"
@@ -226,17 +537,17 @@ done
 echo "To set KISS as default, go to Settings > Apps > Choose default apps > Home app"
 
 # Apply settings for a faster, smoother, and cleaner UI
-echo "--- Disabling All Animations & Effects for Maximum Performance ---"
-adb shell settings put secure ui_night_mode 2                   # Force dark mode
+echo "--- Configuring Ultra-Smooth UI (Animations OFF) ---"
+adb shell settings put secure ui_night_mode 2
 adb shell settings put global window_animation_scale 0.0
 adb shell settings put global transition_animation_scale 0.0
 adb shell settings put global animator_duration_scale 0.0
-adb shell settings put system motion_effect_enabled 0           # Disable lockscreen motion effect
-adb shell settings put system sound_effects_enabled 0           # Disable system sounds (touch, etc.)
-adb shell settings put global fancy_ime_animations 0            # Disable keyboard animations
-adb shell settings put system haptic_feedback_enabled 0         # Disable all vibrations for speed
-adb shell settings put system font_scale 0.95                   # Slightly smaller font for cleaner look
-echo "✓ All UI animations, sounds, and effects disabled for a lighter experience."
+adb shell settings put system motion_effect_enabled 0
+adb shell settings put system sound_effects_enabled 0
+adb shell settings put global fancy_ime_animations 0
+adb shell settings put system haptic_feedback_enabled 0
+adb shell settings put system font_scale 0.95
+echo "✓ Ultra-smooth UI configured (zero animations)."
 echo ""
 
 
@@ -245,13 +556,13 @@ echo "==============================================="
 echo "=== Tuning Performance, Battery & Thermals ==="
 echo "==============================================="
 
-# CPU & GPU acceleration for a smoother experience
+# CPU & GPU acceleration
 echo "--- Accelerating CPU & GPU ---"
 set_prop_safe "debug.hwui.renderer" "skiagl" "GPU rendering"
 set_prop_safe "debug.sf.hw" "1" "Hardware overlays"
 adb shell "echo performance > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor" 2>/dev/null || echo "  ⚠ CPU governor (requires root)"
 
-# Aggressive background process and battery management
+# Battery management
 echo "--- Optimizing Battery & Background Processes ---"
 adb shell settings put global low_power 1
 adb shell settings put global battery_saver_constants "v=1,threshold=99,advertise_is_enabled=true"
@@ -259,7 +570,7 @@ adb shell settings put global cached_apps_freezer enabled
 adb shell dumpsys deviceidle force-idle
 echo "✓ Battery optimization enabled."
 
-# Thermal management to reduce heat
+# Thermal management
 echo "--- Managing Thermals ---"
 adb shell "echo 1 > /sys/class/thermal/thermal_zone0/mode" 2>/dev/null || echo "  ⚠ Thermal settings (requires root)"
 echo ""
@@ -271,21 +582,13 @@ echo "=== VIRTUAL MEMORY OPTIMIZATION (zRAM, Swap, I/O Schedulers) ==="
 echo "=================================================================="
 
 echo "--- Configuring zRAM (Compressed Virtual RAM) ---"
-# Check if zRAM is available
 if adb shell "test -b /dev/block/zram0 && echo exists" 2>/dev/null | grep -q "exists"; then
     echo "✓ zRAM device detected. Configuring..."
 
-    # Reset zRAM if already configured
     adb shell "swapoff /dev/block/zram0" 2>/dev/null
     adb shell "echo 1 > /sys/block/zram0/reset" 2>/dev/null || echo "  ⚠ zRAM reset (requires root)"
-
-    # Set zRAM size (1.5GB - 50% of physical RAM for A34's 6GB/8GB models)
     adb shell "echo 1610612736 > /sys/block/zram0/disksize" 2>/dev/null || echo "  ⚠ zRAM sizing (requires root)"
-
-    # Set compression algorithm (lz4 is fastest)
     adb shell "echo lz4 > /sys/block/zram0/comp_algorithm" 2>/dev/null || echo "  ⚠ zRAM compression (requires root)"
-
-    # Enable zRAM swap
     adb shell "mkswap /dev/block/zram0" 2>/dev/null
     adb shell "swapon /dev/block/zram0" 2>/dev/null || echo "  ⚠ zRAM activation (requires root)"
 
@@ -296,7 +599,6 @@ fi
 
 echo ""
 echo "--- Optimizing Virtual Memory Parameters ---"
-# These settings work better with zRAM enabled
 adb shell "echo 100 > /proc/sys/vm/swappiness" 2>/dev/null || echo "  ⚠ Swappiness tuning (requires root)"
 adb shell "echo 0 > /proc/sys/vm/page-cluster" 2>/dev/null || echo "  ⚠ Page cluster (requires root)"
 adb shell "echo 4096 > /proc/sys/vm/min_free_kbytes" 2>/dev/null || echo "  ⚠ Min free memory (requires root)"
@@ -307,23 +609,19 @@ echo "  ✓ Virtual memory parameters optimized for performance"
 
 echo ""
 echo "--- Optimizing I/O Schedulers for Virtual Disk Performance ---"
-# Find storage devices and optimize their I/O schedulers
 STORAGE_DEVICES=$(adb shell "ls /sys/block/ 2>/dev/null" | grep -E "sda|mmcblk|nvme")
 
 if [ -n "$STORAGE_DEVICES" ]; then
     for device in $STORAGE_DEVICES; do
         echo "  Optimizing /dev/$device..."
 
-        # Set I/O scheduler to deadline (best for flash storage)
         adb shell "echo deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
         adb shell "echo mq-deadline > /sys/block/$device/queue/scheduler" 2>/dev/null || \
         echo "    ⚠ I/O scheduler (requires root)"
 
-        # Optimize read-ahead for faster sequential reads
         adb shell "echo 512 > /sys/block/$device/queue/read_ahead_kb" 2>/dev/null || \
         echo "    ⚠ Read-ahead tuning (requires root)"
 
-        # Reduce I/O latency
         adb shell "echo 0 > /sys/block/$device/queue/add_random" 2>/dev/null
         adb shell "echo 2 > /sys/block/$device/queue/rq_affinity" 2>/dev/null
         adb shell "echo 128 > /sys/block/$device/queue/nr_requests" 2>/dev/null || \

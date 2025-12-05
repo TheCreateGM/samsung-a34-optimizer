@@ -79,8 +79,12 @@ echo ""
 disable_package() {
     local package=$1
     local description=$2
-    echo "Disabling $description ($package)..."
-    adb shell pm disable-user --user 0 "$package" 2>/dev/null
+    if is_package_installed "$package"; then
+        echo "Disabling $description ($package)..."
+        adb shell pm disable-user --user 0 "$package" 2>/dev/null
+    else
+        echo "✓ $description is not installed (skipping)."
+    fi
 }
 
 # Function to enable a package
@@ -126,16 +130,21 @@ install_apk() {
             install_output=$(adb install -r "$temp_apk" 2>&1)
             if echo "$install_output" | grep -q "Success"; then
                 echo "✓ $app_name installed successfully."
+                rm -f "$temp_apk"
+                return 0
             else
                 echo "⚠ Failed to install $app_name."
                 echo "ADB Output: $install_output"
+                rm -f "$temp_apk"
+                return 1
             fi
-            rm -f "$temp_apk"
         else
             echo "⚠ Failed to download $app_name. Continuing anyway..."
+            return 1
         fi
     else
         echo "✓ $app_name is already installed."
+        return 0
     fi
 }
 
@@ -206,18 +215,12 @@ SPYWARE_PACKAGES=(
     "com.chartboost"
     "com.tapjoy"
     
-    # Bloatware with tracking capabilities
-    "com.samsung.android.da.daagent"
-    "com.samsung.android.svoiceime"
-    "com.samsung.android.rubin.app"
-    "com.samsung.android.mateagent"
-    "com.samsung.android.aremoji"
-    "com.sec.android.easyonehand"
-    "com.wssyncmldm"
-    "com.ws.dm"
-    "com.dti.att"
-    "com.dti.tracfone"
-    "com.carrieriq"
+    # Carrier tracking apps (actual spyware/tracking - NOT Samsung system apps)
+    "com.wssyncmldm"           # Carrier device management
+    "com.ws.dm"                # Carrier device management
+    "com.dti.att"              # AT&T tracking
+    "com.dti.tracfone"         # Tracfone tracking
+    "com.carrieriq"            # CarrierIQ spyware
 )
 
 echo "--- Scanning for Known Spyware & Malicious Apps ---"
@@ -230,21 +233,23 @@ for package in "${SPYWARE_PACKAGES[@]}"; do
         SPYWARE_FOUND=$((SPYWARE_FOUND + 1))
         SPYWARE_LIST="$SPYWARE_LIST\n  - $package"
         
+        # Kill any running processes first
+        adb shell am force-stop "$package" 2>/dev/null
+        
+        # Revoke all permissions BEFORE uninstalling
+        if is_package_installed "$package"; then
+            adb shell pm revoke "$package" android.permission.CAMERA 2>/dev/null
+            adb shell pm revoke "$package" android.permission.RECORD_AUDIO 2>/dev/null
+            adb shell pm revoke "$package" android.permission.ACCESS_FINE_LOCATION 2>/dev/null
+            adb shell pm revoke "$package" android.permission.READ_CONTACTS 2>/dev/null
+            adb shell pm revoke "$package" android.permission.READ_SMS 2>/dev/null
+            adb shell pm revoke "$package" android.permission.READ_CALL_LOG 2>/dev/null
+        fi
+        
         # Attempt to uninstall (requires root or user app)
         echo "  Attempting to remove $package..."
         adb shell pm uninstall --user 0 "$package" 2>/dev/null || \
         disable_package "$package" "Spyware: $package"
-        
-        # Kill any running processes
-        adb shell am force-stop "$package" 2>/dev/null
-        
-        # Revoke all permissions
-        adb shell pm revoke "$package" android.permission.CAMERA 2>/dev/null
-        adb shell pm revoke "$package" android.permission.RECORD_AUDIO 2>/dev/null
-        adb shell pm revoke "$package" android.permission.ACCESS_FINE_LOCATION 2>/dev/null
-        adb shell pm revoke "$package" android.permission.READ_CONTACTS 2>/dev/null
-        adb shell pm revoke "$package" android.permission.READ_SMS 2>/dev/null
-        adb shell pm revoke "$package" android.permission.READ_CALL_LOG 2>/dev/null
     fi
 done
 
@@ -266,14 +271,16 @@ else
 fi
 
 echo "--- Scanning for Suspicious Hidden Apps ---"
-HIDDEN_APPS=$(adb shell pm list packages -s | grep -vE "android|samsung|google|knox" | cut -d: -f2)
+# Exclude known legitimate system packages: samsung (com.sec.*), mediatek, qualcomm, etc.
+HIDDEN_APPS=$(adb shell pm list packages -s --user 0 2>/dev/null | grep -vE "android|samsung|google|knox|com\.sec\.|com\.mediatek\.|com\.qualcomm\.|com\.microsoft\.|com\.osp\.|com\.wsomacp" | cut -d: -f2)
 SUSPICIOUS_COUNT=0
 
 for app in $HIDDEN_APPS; do
-    # Check if app has dangerous permissions
+    # Check if app has MANY dangerous permissions (more than 5 to reduce false positives)
     DANGEROUS_PERMS=$(adb shell dumpsys package "$app" 2>/dev/null | grep -E "CAMERA|RECORD_AUDIO|LOCATION|CONTACTS|SMS|CALL_LOG" | wc -l)
     
-    if [ "$DANGEROUS_PERMS" -gt 2 ]; then
+    # Only flag if app has more than 5 dangerous permission references AND is not a known system package
+    if [ "$DANGEROUS_PERMS" -gt 5 ]; then
         echo "⚠ Suspicious system app: $app (Has $DANGEROUS_PERMS dangerous permissions)"
         SUSPICIOUS_COUNT=$((SUSPICIOUS_COUNT + 1))
     fi
@@ -678,8 +685,8 @@ echo "================================================="
 # Install RethinkDNS for on-device firewall and DNS-level blocking
 echo "--- Installing On-Device Firewall (RethinkDNS) ---"
 RETHINK_URLS=(
-    "https://github.com/celzero/rethink-app/releases/download/v0.5.5g/app-fdroid-release.apk"
-    "https://rethinkdns.com/download"
+    "https://github.com/celzero/rethink-app/releases/download/v0.5.5t/app-fdroid-release.apk"
+    "https://github.com/celzero/rethink-app/releases/download/v0.5.5u/app-universal-release.apk"
 )
 
 for RETHINK_URL in "${RETHINK_URLS[@]}"; do
@@ -752,9 +759,9 @@ adb shell dumpsys deviceidle whitelist +com.samsung.android.honeyboard 2>/dev/nu
 echo "✓ Essential apps whitelisted from battery restrictions."
 
 echo "--- Optimizing Storage Performance (No Root Needed) ---"
-# Clear dalvik cache for all apps to force recompilation
+# Trim caches to free up space and optimize performance
 echo "Clearing and rebuilding app cache for optimal performance..."
-adb shell pm clear-cache-all 2>/dev/null
+adb shell pm trim-caches 9999999999 2>/dev/null
 # Trim all mounted filesystems
 adb shell sm fstrim 2>/dev/null || echo "  ⚠ Advanced fstrim requires newer Android version"
 echo "✓ Storage optimization completed."

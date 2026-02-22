@@ -6,7 +6,6 @@
 # CPU/GPU/RAM/Storage/Network/Power/Threading/Privacy/Security - Safe & Idempotent
 # Compatible: Android 12-16+ | Root & Non-Root | Production-Ready
 
-set -e
 trap 'echo "[!] Command failed (safe fallback). Continuing..."; true' ERR 2>/dev/null || true
 
 # Script version
@@ -50,11 +49,101 @@ fi
 echo "[+] Device detected. Starting optimization..."
 echo ""
 
-# Handle restore mode early
-if [ "$SCRIPT_MODE" = "restore" ]; then
+# --- Restore Function (defined early for restore mode) ---
+restore_all_settings() {
     echo "========================================================================"
     echo "=== RESTORE MODE - Reverting All Optimizations ==="
     echo "========================================================================"
+    
+    echo "[*] Restoring CPU Scheduler Settings..."
+    if [ "$ROOT_AVAILABLE" = true ]; then
+        adb shell "echo 18000000 > /proc/sys/kernel/sched_latency_ns 2>/dev/null" || true
+        adb shell "echo 3000000 > /proc/sys/kernel/sched_min_granularity_ns 2>/dev/null" || true
+        adb shell "echo 4000000 > /proc/sys/kernel/sched_wakeup_granularity_ns 2>/dev/null" || true
+        adb shell "echo 500000 > /proc/sys/kernel/sched_migration_cost_ns 2>/dev/null" || true
+        adb shell "echo 950000 > /proc/sys/kernel/sched_rt_runtime_us 2>/dev/null" || true
+        adb shell "echo 1024 > /proc/sys/kernel/sched_util_clamp_max 2>/dev/null" || true
+        adb shell "echo 0 > /proc/sys/kernel/sched_util_clamp_min 2>/dev/null" || true
+        for cpu in $(adb shell "ls /sys/devices/system/cpu 2>/dev/null" | tr -d '\r' | grep -E '^cpu[0-9]+$'); do
+            adb shell "echo schedutil > /sys/devices/system/cpu/$cpu/cpufreq/scaling_governor 2>/dev/null" || true
+        done
+    fi
+    echo "[+] CPU Scheduler restored"
+
+    echo "[*] Restoring Virtual Memory & LMK Settings..."
+    if [ "$ROOT_AVAILABLE" = true ]; then
+        adb shell "swapoff /dev/block/zram0 2>/dev/null" || true
+        adb shell "echo 1 > /sys/block/zram0/reset 2>/dev/null" || true
+        adb shell "echo 60 > /proc/sys/vm/swappiness 2>/dev/null" || true
+        adb shell "echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null" || true
+        adb shell "echo 3 > /proc/sys/vm/page-cluster 2>/dev/null" || true
+        adb shell "echo 65536 > /proc/sys/vm/min_free_kbytes 2>/dev/null" || true
+        if adb shell "test -f /sys/module/lowmemorykiller/parameters/minfree 2>/dev/null" 2>/dev/null; then
+            adb shell "echo '18432,23040,27648,32256,55296,80640' > /sys/module/lowmemorykiller/parameters/minfree 2>/dev/null" || true
+        fi
+        adb shell "echo '32' > /sys/module/lowmemorykiller/parameters/cost 2>/dev/null" || true
+        adb shell "echo '0' > /sys/module/lowmemorykiller/parameters/lmk_fast_run 2>/dev/null" || true
+    fi
+    echo "[+] Virtual memory & LMK restored"
+    
+    echo "[*] Re-enabling Disabled Packages..."
+    enable_package "com.samsung.android.bixby.agent" "Bixby Voice"
+    enable_package "com.samsung.android.game.gamehome" "Game Launcher"
+    enable_package "com.google.android.googlequicksearchbox" "Google Search"
+    enable_package "com.google.android.as" "Android System Intelligence"
+    enable_package "com.samsung.android.samsunganalytics" "Samsung Analytics"
+    
+    echo "[*] Restoring Performance Settings..."
+    adb shell settings put global low_power 0
+    adb shell settings put global battery_saver_constants ""
+    adb shell settings put secure location_mode 3
+    adb shell settings put global background_app_limit -1
+    adb shell settings put global app_standby_enabled 1
+    adb shell settings put global forced_app_standby_enabled 1
+    
+    echo "[*] Restoring Animation Scales & UI..."
+    adb shell settings put global window_animation_scale 1.0
+    adb shell settings put global transition_animation_scale 1.0
+    adb shell settings put global animator_duration_scale 1.0
+    adb shell settings put system motion_effect_enabled 1
+    adb shell settings put system sound_effects_enabled 1
+    adb shell settings put system haptic_feedback_enabled 1
+    adb shell settings put global fancy_ime_animations 1
+    adb shell settings put secure ui_night_mode 0
+    adb shell settings put system font_scale 1.0
+    
+    echo "[*] Restoring Network Settings..."
+    adb shell settings put global private_dns_mode off
+    adb shell settings put global private_dns_specifier ""
+    adb shell settings put global wifi_scan_always_enabled 1
+    adb shell settings put global ble_scan_always_enabled 1
+    adb shell settings put global captive_portal_detection_enabled 1
+    adb shell settings put global captive_portal_mode 1
+    
+    echo "[*] Restoring Security Settings..."
+    adb shell settings put global install_non_market_apps 1
+    adb shell settings put global development_settings_enabled 1
+    adb shell settings put global adb_enabled 1
+    
+    echo "[*] Restoring Thermal Defaults..."
+    if [ "$ROOT_AVAILABLE" = true ] && [ "$THERMAL_AVAILABLE" = true ]; then
+        for tz in $(adb shell "ls /sys/class/thermal 2>/dev/null" | tr -d '\r' | grep thermal_zone); do
+            adb shell "echo 'default' > /sys/class/thermal/$tz/mode 2>/dev/null" || true
+        done
+    fi
+    
+    echo "[*] Clearing Optimization Flags..."
+    adb shell setprop persist.sys.ultra_opt.pending 0 2>/dev/null
+    adb shell setprop persist.sys.ultra_opt.version "" 2>/dev/null
+    
+    echo ""
+    echo "[+] Default settings have been restored."
+    echo "[i] Uninstall KISS Launcher, RethinkDNS, and Termux manually if desired."
+    echo "[i] A reboot is recommended."
+}
+
+# Handle restore mode early
+if [ "$SCRIPT_MODE" = "restore" ]; then
     restore_all_settings
     exit 0
 fi
@@ -1350,104 +1439,6 @@ echo "    6. Disable USB debugging when not developing"
 echo ""
 echo "[*] To revert: ./autorun.sh restore"
 echo ""
-
-# --- Restore Function ---
-restore_all_settings() {
-    echo "========================================================================"
-    echo "=== RESTORE MODE - Reverting All Optimizations ==="
-    echo "========================================================================"
-    
-    echo "[*] Restoring CPU Scheduler Settings..."
-    if [ "$ROOT_AVAILABLE" = true ]; then
-        adb shell "echo 18000000 > /proc/sys/kernel/sched_latency_ns 2>/dev/null" || true
-        adb shell "echo 3000000 > /proc/sys/kernel/sched_min_granularity_ns 2>/dev/null" || true
-        adb shell "echo 4000000 > /proc/sys/kernel/sched_wakeup_granularity_ns 2>/dev/null" || true
-        adb shell "echo 500000 > /proc/sys/kernel/sched_migration_cost_ns 2>/dev/null" || true
-        adb shell "echo 950000 > /proc/sys/kernel/sched_rt_runtime_us 2>/dev/null" || true
-        adb shell "echo 1024 > /proc/sys/kernel/sched_util_clamp_max 2>/dev/null" || true
-        adb shell "echo 0 > /proc/sys/kernel/sched_util_clamp_min 2>/dev/null" || true
-        for cpu in $(adb shell "ls /sys/devices/system/cpu 2>/dev/null" | tr -d '\r' | grep -E '^cpu[0-9]+$'); do
-            adb shell "echo schedutil > /sys/devices/system/cpu/$cpu/cpufreq/scaling_governor 2>/dev/null" || true
-        done
-    fi
-    echo "[+] CPU Scheduler restored"
-
-    echo "[*] Restoring Virtual Memory & LMK Settings..."
-    if [ "$ROOT_AVAILABLE" = true ]; then
-        adb shell "swapoff /dev/block/zram0 2>/dev/null" || true
-        adb shell "echo 1 > /sys/block/zram0/reset 2>/dev/null" || true
-        adb shell "echo 60 > /proc/sys/vm/swappiness 2>/dev/null" || true
-        adb shell "echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null" || true
-        adb shell "echo 3 > /proc/sys/vm/page-cluster 2>/dev/null" || true
-        adb shell "echo 65536 > /proc/sys/vm/min_free_kbytes 2>/dev/null" || true
-        if adb shell "test -f /sys/module/lowmemorykiller/parameters/minfree 2>/dev/null" 2>/dev/null; then
-            adb shell "echo '18432,23040,27648,32256,55296,80640' > /sys/module/lowmemorykiller/parameters/minfree 2>/dev/null" || true
-        fi
-        adb shell "echo '32' > /sys/module/lowmemorykiller/parameters/cost 2>/dev/null" || true
-        adb shell "echo '0' > /sys/module/lowmemorykiller/parameters/lmk_fast_run 2>/dev/null" || true
-    fi
-    echo "[+] Virtual memory & LMK restored"
-    
-    echo "[*] Re-enabling Disabled Packages..."
-    enable_package "com.samsung.android.bixby.agent" "Bixby Voice"
-    enable_package "com.samsung.android.game.gamehome" "Game Launcher"
-    enable_package "com.google.android.googlequicksearchbox" "Google Search"
-    enable_package "com.google.android.as" "Android System Intelligence"
-    enable_package "com.samsung.android.samsunganalytics" "Samsung Analytics"
-    
-    echo "[*] Restoring Performance Settings..."
-    adb shell settings put global low_power 0
-    adb shell settings put global battery_saver_constants ""
-    adb shell settings put secure location_mode 3
-    adb shell settings put global background_app_limit -1
-    adb shell settings put global app_standby_enabled 1
-    adb shell settings put global forced_app_standby_enabled 1
-    
-    echo "[*] Restoring Animation Scales & UI..."
-    adb shell settings put global window_animation_scale 1.0
-    adb shell settings put global transition_animation_scale 1.0
-    adb shell settings put global animator_duration_scale 1.0
-    adb shell settings put system motion_effect_enabled 1
-    adb shell settings put system sound_effects_enabled 1
-    adb shell settings put system haptic_feedback_enabled 1
-    adb shell settings put global fancy_ime_animations 1
-    adb shell settings put secure ui_night_mode 0
-    adb shell settings put system font_scale 1.0
-    
-    echo "[*] Restoring Network Settings..."
-    adb shell settings put global private_dns_mode off
-    adb shell settings put global private_dns_specifier ""
-    adb shell settings put global wifi_scan_always_enabled 1
-    adb shell settings put global ble_scan_always_enabled 1
-    adb shell settings put global captive_portal_detection_enabled 1
-    adb shell settings put global captive_portal_mode 1
-    
-    echo "[*] Restoring Security Settings..."
-    adb shell settings put global install_non_market_apps 1
-    adb shell settings put global development_settings_enabled 1
-    adb shell settings put global adb_enabled 1
-    
-    echo "[*] Restoring Thermal Defaults..."
-    if [ "$ROOT_AVAILABLE" = true ] && [ "$THERMAL_AVAILABLE" = true ]; then
-        for tz in $(adb shell "ls /sys/class/thermal 2>/dev/null" | tr -d '\r' | grep thermal_zone); do
-            adb shell "echo 'default' > /sys/class/thermal/$tz/mode 2>/dev/null" || true
-        done
-    fi
-    
-    echo "[*] Clearing Optimization Flags..."
-    adb shell setprop persist.sys.ultra_opt.pending 0 2>/dev/null
-    adb shell setprop persist.sys.ultra_opt.version "" 2>/dev/null
-    
-    echo ""
-    echo "[+] Default settings have been restored."
-    echo "[i] Uninstall KISS Launcher, RethinkDNS, and Termux manually if desired."
-    echo "[i] A reboot is recommended."
-}
-
-# Handle restore mode from command line
-if [ "$SCRIPT_MODE" = "restore" ]; then
-    restore_all_settings
-fi
 
 echo ""
 echo "[+] Script completed successfully!"
